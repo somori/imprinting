@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>すりこみ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#FFFCF2; --paper:#fff;
+  --ink:#231815; --ink-soft:#7C716C;
+  --yellow:#FFF100; --orange:#F8B62D; --red:#E13922;
+  --line:rgba(35,24,21,.18);
+  --scrim:rgba(35,24,21,.66);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#2B2724; --paper:#38322E;
+    --ink:#FFF7EC; --ink-soft:#B3A69E;
+    --line:rgba(255,247,236,.22);
+    --scrim:rgba(10,7,5,.72);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#2B2724; --paper:#38322E;
+  --ink:#FFF7EC; --ink-soft:#B3A69E;
+  --line:rgba(255,247,236,.22);
+  --scrim:rgba(10,7,5,.72);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;
+  font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN','Hiragino Sans','Yu Gothic',Meiryo,system-ui,sans-serif;
+  font-weight:500;-webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;overflow:hidden;touch-action:manipulation;
+}
+button,label.pick{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+input,textarea{user-select:auto;-webkit-user-select:auto}
+:focus-visible{outline:3px solid var(--orange);outline-offset:3px;border-radius:6px}
+img,svg{display:block}
+[hidden]{display:none!important}
+
+#app{position:relative;width:100%;height:100dvh;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .4s ease,visibility .4s}
+.screen.is-on{opacity:1;visibility:visible;pointer-events:auto}
+
+/* ---------- 1. なかみをえらぶ ---------- */
+#screenStart{justify-content:space-between;
+  padding:max(26px,env(safe-area-inset-top)) 20px max(22px,env(safe-area-inset-bottom));
+  overflow-y:auto;user-select:none}
+.head{text-align:center;flex:0 0 auto}
+.title{display:flex;justify-content:center;font-weight:900;font-size:clamp(38px,11vmin,60px)}
+.title span{display:block;transform-origin:50% 90%}
+.title span:nth-child(1){transform:translateY(5px) rotate(-7deg)}
+.title span:nth-child(2){transform:translateY(-5px) rotate(-2.5deg)}
+.title span:nth-child(3){transform:translateY(-5px) rotate(2.5deg)}
+.title span:nth-child(4){transform:translateY(5px) rotate(7deg)}
+.lede{margin:12px auto 0;color:var(--ink-soft);font-size:15px;line-height:1.85;max-width:29ch}
+.stage-preview{flex:1 1 auto;display:grid;place-items:center;width:100%;min-height:130px}
+.foot{flex:0 0 auto;width:100%;max-width:440px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.pick-label{font-size:13px;color:var(--ink-soft)}
+.picks{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.pick{
+  position:relative;width:64px;height:64px;border-radius:50%;
+  background:var(--paper);border:2.5px solid var(--ink);
+  background-size:62%;background-position:center;background-repeat:no-repeat;
+  display:grid;place-items:center;overflow:hidden;
+  transition:transform .16s cubic-bezier(.34,1.56,.64,1),box-shadow .16s;
+}
+.pick:hover{transform:translateY(-3px)}
+.pick.is-picked{transform:translateY(-4px);box-shadow:0 0 0 4px var(--yellow)}
+.pick .photo-icon{width:62%;height:auto}
+.pick.has-photo{background-size:cover}
+.pick.has-photo .photo-icon{display:none}
+
+.go{
+  width:100%;max-width:300px;padding:15px 24px;border-radius:999px;
+  background:var(--yellow);color:#231815;font-weight:900;font-size:17px;
+  border:3px solid #231815;box-shadow:0 5px 0 #231815;
+  transition:transform .1s,box-shadow .1s,opacity .2s;
+}
+.go:active{transform:translateY(4px);box-shadow:0 1px 0 #231815}
+.go:disabled{opacity:.35;cursor:default;transform:none;box-shadow:0 5px 0 #231815}
+.go-note{font-size:12px;color:var(--ink-soft);min-height:1.2em;text-align:center}
+.ghost{
+  padding:11px 18px;border-radius:999px;font-size:14px;font-weight:700;
+  background:var(--paper);border:2.5px solid var(--ink);color:var(--ink);
+  box-shadow:0 3px 0 var(--ink);transition:transform .1s,box-shadow .1s,opacity .2s;
+}
+.ghost:active{transform:translateY(3px);box-shadow:0 0 0 var(--ink)}
+.ghost:disabled{opacity:.3;cursor:default}
+
+/* ---------- 2. 切り抜く → 顔をおく ---------- */
+#screenCut{justify-content:space-between;
+  padding:max(20px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom));user-select:none}
+.cut-head{text-align:center;flex:0 0 auto}
+.cut-head h2{font-size:19px;font-weight:900}
+.cut-head p{margin-top:6px;font-size:13px;color:var(--ink-soft);line-height:1.7}
+.cut-area{position:relative;flex:1 1 auto;width:100%;max-width:560px;
+  display:grid;place-items:center;margin:14px 0;min-height:0}
+#cutBox{position:relative;touch-action:none}
+#cutImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:3px;
+  pointer-events:none;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
+#cutCanvas{position:absolute;inset:0;width:100%;height:100%;border-radius:3px}
+#faceBox{position:relative;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+#faceBox:active{cursor:grabbing}
+#faceImg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  pointer-events:none;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
+.cut-tools{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;max-width:440px}
+.row{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+.slider{display:flex;align-items:center;gap:12px;width:100%;max-width:290px;font-size:12px;color:var(--ink-soft)}
+input[type=range]{flex:1;accent-color:var(--orange);height:26px}
+
+/* ---------- 目と口 ---------- */
+.face{position:absolute;width:var(--fw,90px);translate:-50% -50%;z-index:2;pointer-events:none}
+.face-svg{width:100%;height:auto;overflow:visible}
+.face .eyes ellipse{fill:#231815}
+.face .eyes{transform-box:fill-box;transform-origin:center;transition:transform .08s linear}
+.face .beak{transform-box:fill-box;transform-origin:50% 0;transition:transform .1s ease-out}
+.chirping .face .beak{transform:scaleY(1.45) scaleX(1.08)}
+
+/* ---------- たまご ---------- */
+.egg-wrap{position:relative;display:grid;place-items:center}
+.egg-wrap .ground{position:absolute;bottom:-10px;width:56%;height:13px;border-radius:50%;
+  background:rgba(35,24,21,.18);filter:blur(6px)}
+.egg{position:relative;width:var(--egg-w);aspect-ratio:137.08/143.06;will-change:transform}
+.egg-svg{width:100%;height:100%}
+.egg-svg .peek{filter:blur(2.4px);opacity:.22;transition:opacity .5s}
+.egg-svg .cr{fill:none;stroke:#231815;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;
+  opacity:0;transition:opacity .2s}
+.egg-svg .cr.on{opacity:1}
+.egg-svg .drip{opacity:0;transform:translateY(-4px);transition:opacity .35s,transform .5s cubic-bezier(.3,1.4,.5,1)}
+.egg-svg .drip.on{opacity:1;transform:translateY(0)}
+.splat{position:absolute;left:0;top:0;width:var(--sw,240px);translate:-50% -50%;pointer-events:none;z-index:2}
+.splat svg{width:100%;height:auto}
+#againBtn{position:absolute;left:50%;translate:-50% 0;
+  bottom:max(40px,calc(env(safe-area-inset-bottom) + 30px));width:auto;z-index:5}
+.shard{position:absolute;left:50%;top:50%;width:15px;height:13px;
+  background:#fff;border:2.5px solid #231815;border-radius:46% 54% 38% 62%/58% 42% 58% 42%;
+  pointer-events:none}
+
+/* ---------- 3. あそぶ ---------- */
+#screenStage{justify-content:center;touch-action:none}
+#field{position:absolute;inset:0}
+#field::after{content:'';position:absolute;left:50%;bottom:-20%;translate:-50% 0;
+  width:min(640px,115vw);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,241,0,.3),transparent 62%);pointer-events:none}
+.egg-pos{position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:2}
+.hint{position:absolute;left:50%;translate:-50% 0;bottom:max(32px,calc(env(safe-area-inset-bottom) + 22px));
+  color:var(--ink-soft);font-size:14px;text-align:center;line-height:1.7;transition:opacity .6s;padding:0 20px}
+.status{position:absolute;left:50%;translate:-50% 0;top:max(30px,calc(env(safe-area-inset-top) + 18px));
+  font-size:16px;font-weight:700;transition:opacity .35s}
+
+.chick{position:absolute;left:0;top:0;width:0;height:0;will-change:transform;z-index:3}
+.chick-shadow{position:absolute;left:50%;translate:-50% 0;border-radius:50%;
+  background:rgba(35,24,21,.2);filter:blur(5px)}
+.chick-body{position:absolute;will-change:transform;transform-origin:50% 88%}
+.chick-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  pointer-events:none;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
+.heart{position:absolute;pointer-events:none;font-size:20px;line-height:1;color:var(--red);z-index:4}
+.zzz{position:absolute;pointer-events:none;font-weight:900;line-height:1;color:var(--ink);opacity:.55;z-index:4}
+
+.hud{position:absolute;left:0;right:0;top:0;padding:max(13px,env(safe-area-inset-top)) 14px 0;
+  display:flex;align-items:center;gap:10px;opacity:0;transition:opacity .6s;pointer-events:none}
+.hud.on{opacity:1;pointer-events:auto}
+.meter{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ink);
+  background:var(--paper);border:2.5px solid var(--ink);padding:6px 12px;border-radius:999px}
+.bar{width:70px;height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0%;border-radius:99px;background:var(--red);
+  transition:width .45s cubic-bezier(.22,1,.36,1)}
+.hud-sp{flex:1}
+.hud button{background:var(--paper);border:2.5px solid var(--ink);padding:7px 13px;
+  border-radius:999px;font-size:13px;font-weight:700;color:var(--ink)}
+.hud button:active{transform:scale(.95)}
+.flash{position:absolute;left:50%;top:50%;translate:-50% -50%;text-align:center;pointer-events:none;opacity:0}
+.flash .big{font-size:clamp(46px,15vmin,84px);font-weight:900;color:var(--ink)}
+.flash .sub{margin-top:4px;font-size:15px;font-weight:700}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 1. なかみをえらぶ ============ -->
+  <section class="screen is-on" id="screenStart">
+    <div class="head">
+      <h1 class="title" aria-label="すりこみ"><span>す</span><span>り</span><span>こ</span><span>み</span></h1>
+      <p class="lede">たまごになかみを入れてあたためると、10秒でかえります。生まれた子は、はじめに見たものについていきます。</p>
+    </div>
+    <div class="stage-preview">
+      <div class="egg-wrap" style="--egg-w:clamp(104px,27vmin,152px)">
+        <div class="ground"></div>
+        <div class="egg" id="eggPreview"></div>
+      </div>
+    </div>
+    <div class="foot">
+      <p class="pick-label">たまごのなかみ</p>
+      <div class="picks" id="picks">
+        <label class="pick" id="pickFile" aria-label="スマホの写真から選ぶ">
+          <input type="file" accept="image/*" id="fileInput" hidden>
+          <svg class="photo-icon" viewBox="0 0 48 40" aria-hidden="true">
+            <rect x="3" y="5" width="42" height="32" rx="6" fill="none" stroke="#231815" stroke-width="3.4"/>
+            <circle cx="15" cy="15.5" r="3.6" fill="#F8B62D" stroke="#231815" stroke-width="2.6"/>
+            <path d="M6.5 32.5 L19 20 L27 27.5 L33.5 21.5 L41.5 29.5" fill="none" stroke="#231815"
+              stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </label>
+      </div>
+      <button class="go" id="goBtn" disabled>この中身にする</button>
+      <p class="go-note" id="goNote">なかみをえらんでください</p>
+    </div>
+  </section>
+
+  <!-- ============ 2. 切り抜く → 顔をおく ============ -->
+  <section class="screen" id="screenCut">
+    <div class="cut-head">
+      <h2 id="cutTitle">指でなぞって切り抜く</h2>
+      <p id="cutSub">囲んだ内側が、生まれてくる子になります</p>
+    </div>
+    <div class="cut-area">
+      <div id="cutBox">
+        <img id="cutImg" alt="切り抜く写真" draggable="false">
+        <canvas id="cutCanvas"></canvas>
+      </div>
+      <div id="faceBox" hidden>
+        <img id="faceImg" alt="生まれてくる子" draggable="false">
+        <div class="face" id="facePreview"></div>
+      </div>
+    </div>
+    <div class="cut-tools">
+      <div class="slider" id="sizeRow" hidden>
+        <span>顔の大きさ</span>
+        <input type="range" id="faceSize" min="20" max="100" value="55" aria-label="顔の大きさ">
+      </div>
+      <div class="row" id="cutRow">
+        <button class="ghost" id="undoBtn" disabled>やりなおす</button>
+        <button class="ghost" id="skipBtn">切らずに使う</button>
+        <button class="ghost" id="backBtn">なかみを変える</button>
+      </div>
+      <div class="row" id="faceRow" hidden>
+        <button class="ghost" id="faceBackBtn">もどる</button>
+        <button class="ghost" id="noFaceBtn" aria-pressed="false">目と口をつけない</button>
+      </div>
+      <button class="go" id="cutOkBtn" disabled>切り抜く</button>
+    </div>
+  </section>
+
+  <!-- ============ 3. たまご → ふ化 → あそぶ ============ -->
+  <section class="screen" id="screenStage">
+    <div id="field">
+      <div class="egg-wrap egg-pos" id="eggHome" style="--egg-w:clamp(148px,39vmin,224px)">
+        <div class="ground"></div>
+        <div class="egg" id="eggMain"></div>
+      </div>
+      <div class="splat" id="splat" hidden></div>
+      <div class="chick" id="chick" hidden>
+        <div class="chick-shadow" id="chickShadow"></div>
+        <div class="chick-body" id="chickBody">
+          <img class="chick-photo" id="chickPhoto" alt="生まれた子" draggable="false">
+          <div class="face" id="faceLive"></div>
+        </div>
+      </div>
+    </div>
+    <p class="status" id="status">あたためています</p>
+    <p class="hint" id="hint">たまごをつつくと、はやく出てきます</p>
+    <div class="hud" id="hud">
+      <div class="meter"><span>なつき</span><div class="bar"><i id="bond"></i></div></div>
+      <div class="hud-sp"></div>
+      <button id="soundBtn" aria-pressed="true">音 ON</button>
+      <button id="resetBtn">はじめから</button>
+    </div>
+    <button class="go" id="againBtn" hidden>もういちど</button>
+    <div class="flash" id="flash"><div class="big" id="flashBig">ピヨ</div><div class="sub" id="flashSub">すりこみ完了</div></div>
+  </section>
+</div>
+
+<script>
+/* =====================================================================
+   すりこみ
+   ---------------------------------------------------------------------
+   なかみ / たまご / 目と口 は、いただいた SVG をそのまま埋め込んでいます。
+   ・なかみを足す      → CONTENTS に {name, src} を追加
+   ・たまごの形を変える → EGG_FILL / EGG_INK のパスを差し替え
+   ・顔を変える        → FACE_HTML を差し替え
+   音は Web Audio で合成しているので音声ファイルは不要です。
+   ===================================================================== */
+
+/* ---- なかみ（01/02/03） ---- */
+const CONTENTS = [
+  { name:'きいろ', src:'data:image/svg+xml,%3Csvg%20width%3D%22500%22%20height%3D%22424%22%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%202%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2087.29%2073.98%22%3E%20%3Cdefs%3E%20%3Cstyle%3E%20.cls-1%20%7B%20fill%3A%20%23231815%3B%20%7D%20.cls-2%20%7B%20fill%3A%20%23fff100%3B%20%7D%20%3C%2Fstyle%3E%20%3C%2Fdefs%3E%20%3Cg%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_1-2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%201%22%3E%20%3Cg%3E%20%3Cpath%20class%3D%22cls-2%22%20d%3D%22M50.62%2C70.98c-7.08.75-14.19-.77-21.13-2.38-8.73-2.02-18.22-4.72-23.25-12.14-3.27-4.82-4.07-10.95-3.57-16.75.73-8.48%2C4.1-16.71%2C9.53-23.26C22.8%2C3.65%2C42.42-1.71%2C57.09%2C6.11c3.12%2C1.66%2C6.01%2C3.9%2C7.95%2C6.85%2C3.1%2C4.73%2C3.5%2C10.83%2C6.52%2C15.62%2C3.27%2C5.18%2C9.29%2C8.32%2C11.92%2C13.84%2C3.68%2C7.7-.93%2C17.31-8%2C22.09s-15.91%2C5.93-24.38%2C6.96%22%2F%3E%20%3Cpath%20class%3D%22cls-1%22%20d%3D%22M50.62%2C68.48c-8.62.85-17.46-1.31-25.72-3.6-6.39-1.77-13.32-4.46-16.95-10.37-4.04-6.57-3.41-15.22-1.32-22.34s6.22-13.75%2C11.95-18.59C28.27%2C5.39%2C43.18%2C2.07%2C54.89%2C7.79c3.34%2C1.63%2C6.51%2C3.87%2C8.42%2C7.12s2.63%2C7.04%2C3.99%2C10.54c1.44%2C3.71%2C3.57%2C6.74%2C6.41%2C9.52%2C2.41%2C2.35%2C5.16%2C4.53%2C6.93%2C7.44%2C3.43%2C5.66.99%2C12.68-3.24%2C17.19-5.28%2C5.65-13.31%2C7.51-20.67%2C8.64-1.87.28-3.74.51-5.62.74-1.34.16-2.5%2C1.03-2.5%2C2.5%2C0%2C1.23%2C1.15%2C2.66%2C2.5%2C2.5%2C8.67-1.05%2C17.82-2.17%2C25.3-7.06%2C6.34-4.15%2C11.32-11.67%2C10.86-19.48-.24-4.09-1.98-7.61-4.64-10.67-2.5-2.88-5.64-5.16-8.01-8.16-2.49-3.15-3.35-7.12-4.63-10.83-1.47-4.26-3.61-8.04-7.18-10.87-12.29-9.76-30.19-8.49-42.97-.39-6.86%2C4.35-12.29%2C10.67-15.66%2C18.06C.55%2C32.52-1.22%2C41.94.94%2C50.54c1.03%2C4.11%2C3.15%2C7.92%2C6.22%2C10.86%2C2.88%2C2.75%2C6.35%2C4.66%2C10.01%2C6.15s7.35%2C2.45%2C11.11%2C3.33c4.89%2C1.15%2C9.83%2C2.22%2C14.85%2C2.63%2C2.5.2%2C4.99.2%2C7.49-.04%2C1.34-.13%2C2.5-1.05%2C2.5-2.5%2C0-1.25-1.15-2.63-2.5-2.5h0Z%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E' },
+  { name:'にわとり', src:'data:image/svg+xml,%3Csvg%20width%3D%22454%22%20height%3D%22500%22%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%202%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2087.29%2096.13%22%3E%20%3Cdefs%3E%20%3Cstyle%3E%20.cls-1%20%7B%20fill%3A%20%23fff%3B%20%7D%20.cls-2%20%7B%20fill%3A%20%23231815%3B%20%7D%20.cls-3%20%7B%20fill%3A%20%23e13922%3B%20%7D%20%3C%2Fstyle%3E%20%3C%2Fdefs%3E%20%3Cg%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_1-2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%201%22%3E%20%3Cg%3E%20%3Cg%3E%20%3Cpath%20class%3D%22cls-1%22%20d%3D%22M50.62%2C93.14c-7.08.75-14.19-.77-21.13-2.38-8.73-2.02-18.22-4.72-23.25-12.14-3.27-4.82-4.07-10.95-3.57-16.75.73-8.48%2C4.1-16.71%2C9.53-23.26%2C10.61-12.8%2C30.22-18.17%2C44.9-10.35%2C3.12%2C1.66%2C6.01%2C3.9%2C7.95%2C6.85%2C3.1%2C4.73%2C3.5%2C10.83%2C6.52%2C15.62%2C3.27%2C5.18%2C9.29%2C8.32%2C11.92%2C13.84%2C3.68%2C7.7-.93%2C17.31-8%2C22.09s-15.91%2C5.93-24.38%2C6.96%22%2F%3E%20%3Cpath%20class%3D%22cls-2%22%20d%3D%22M50.62%2C90.64c-8.62.85-17.46-1.31-25.72-3.6-6.39-1.77-13.32-4.46-16.95-10.37-4.04-6.57-3.41-15.22-1.32-22.34s6.22-13.75%2C11.95-18.59c9.69-8.19%2C24.6-11.51%2C36.32-5.8%2C3.34%2C1.63%2C6.51%2C3.87%2C8.42%2C7.12s2.63%2C7.04%2C3.99%2C10.54c1.44%2C3.71%2C3.57%2C6.74%2C6.41%2C9.52%2C2.41%2C2.35%2C5.16%2C4.53%2C6.93%2C7.44%2C3.43%2C5.66.99%2C12.68-3.24%2C17.19-5.28%2C5.65-13.31%2C7.51-20.67%2C8.64-1.87.28-3.74.51-5.62.74-1.34.16-2.5%2C1.03-2.5%2C2.5%2C0%2C1.23%2C1.15%2C2.66%2C2.5%2C2.5%2C8.67-1.05%2C17.82-2.17%2C25.3-7.06%2C6.34-4.15%2C11.32-11.67%2C10.86-19.48-.24-4.09-1.98-7.61-4.64-10.67-2.5-2.88-5.64-5.16-8.01-8.16-2.49-3.15-3.35-7.12-4.63-10.83-1.47-4.26-3.61-8.04-7.18-10.87-12.29-9.76-30.19-8.49-42.97-.39-6.86%2C4.35-12.29%2C10.67-15.66%2C18.06-3.63%2C7.95-5.4%2C17.37-3.23%2C25.98%2C1.03%2C4.11%2C3.15%2C7.92%2C6.22%2C10.86%2C2.88%2C2.75%2C6.35%2C4.66%2C10.01%2C6.15s7.35%2C2.45%2C11.11%2C3.33c4.89%2C1.15%2C9.83%2C2.22%2C14.85%2C2.63%2C2.5.2%2C4.99.2%2C7.49-.04%2C1.34-.13%2C2.5-1.05%2C2.5-2.5%2C0-1.25-1.15-2.63-2.5-2.5h0Z%22%2F%3E%20%3C%2Fg%3E%20%3Cg%3E%20%3Cpath%20class%3D%22cls-3%22%20d%3D%22M52.61%2C15.7c-1.34-2.95-2.94-5.79-4.78-8.47-1.17-1.71-2.53-3.43-4.44-4.25-3.03-1.3-6.73.14-8.77%2C2.72s-2.69%2C6.02-2.66%2C9.31c-1.46-2.34-3.51-4.49-6.17-5.23s-5.95.38-6.95%2C2.95c-.5%2C1.28-.39%2C2.71-.14%2C4.06%2C1.31%2C7.11%2C6.28%2C13.17%2C12.32%2C17.15%2C4.04-3.22%2C9.06-4.9%2C13.97-6.52%2C4.05-1.34%2C8.87-2.57%2C12.28%2C0%2C1.45-4.48-.42-9.82-4.35-12.41%22%2F%3E%20%3Cpath%20class%3D%22cls-2%22%20d%3D%22M54.77%2C14.44c-1.57-3.41-3.42-6.75-5.7-9.74C46.95%2C1.92%2C44.03-.28%2C40.35.03c-3.44.29-6.43%2C2.21-8.35%2C5.05s-2.54%2C6.52-2.54%2C9.94l4.66-1.26c-2.24-3.51-5.77-6.84-10.23-6.68s-8.07%2C3.47-7.89%2C8.09c.35%2C8.71%2C6.84%2C16.33%2C13.76%2C20.95%2C1.01.67%2C2.18.27%2C3.03-.39%2C3.51-2.75%2C7.87-4.22%2C12.05-5.61%2C3.46-1.15%2C7.86-2.88%2C11.18-.53%2C1.37.97%2C3.24-.07%2C3.67-1.49%2C1.73-5.7-.64-11.9-5.5-15.23-1.11-.76-2.77-.21-3.42.9-.72%2C1.24-.22%2C2.65.9%2C3.42%2C3.04%2C2.08%2C4.25%2C6.12%2C3.2%2C9.58l3.67-1.49c-4.36-3.08-9.97-1.64-14.62-.11-5.21%2C1.72-10.3%2C3.62-14.66%2C7.03l3.03-.39c-5.12-3.42-9.46-8.43-10.93-14.52-.28-1.17-.7-2.72-.08-3.84.43-.79%2C1.44-1.24%2C2.29-1.34%2C2.69-.34%2C4.89%2C2.07%2C6.24%2C4.19s4.66%2C1.29%2C4.66-1.26c0-4%2C1.46-10.11%2C6.58-10.01%2C2.21.04%2C3.64%2C2.02%2C4.77%2C3.69%2C1.78%2C2.62%2C3.32%2C5.4%2C4.65%2C8.28.56%2C1.23%2C2.34%2C1.53%2C3.42.9%2C1.26-.74%2C1.46-2.19.9-3.42h0Z%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E' },
+  { name:'みどり', src:'data:image/svg+xml,%3Csvg%20width%3D%22500%22%20height%3D%22491%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%20viewBox%3D%220%200%2086.7%2085.07%22%3E%20%3Cdefs%3E%20%3Cstyle%3E%20.cls-1%20%7B%20fill%3A%20none%3B%20%7D%20.cls-2%20%7B%20isolation%3A%20isolate%3B%20%7D%20.cls-3%20%7B%20fill%3A%20%238fc31f%3B%20%7D%20.cls-4%20%7B%20fill%3A%20%23231815%3B%20%7D%20.cls-5%20%7B%20mix-blend-mode%3A%20multiply%3B%20%7D%20.cls-6%20%7B%20fill%3A%20%2300913a%3B%20%7D%20.cls-7%20%7B%20clip-path%3A%20url%28%23clippath%29%3B%20%7D%20%3C%2Fstyle%3E%20%3CclipPath%20id%3D%22clippath%22%3E%20%3Cpath%20class%3D%22cls-1%22%20d%3D%22M53.05%2C61.1c-4.41-1.15-8.69-2.76-12.73-4.8-1.58-.8-3.22-1.76-3.88-3.33-1.01-2.39.73-5.02%2C2.75-6.75%2C5.43-4.63%2C13.96-7.05%2C15.85-13.7.93-3.28-.15-6.8-1.93-9.75-3.75-6.2-10.66-10.51-18.13-11.83s-15.39.25-21.93%2C3.88c-4.35%2C2.42-8.5%2C7.1-6.53%2C11.46%2C1.72%2C3.79%2C6.9%2C4.78%2C10.21%2C7.5%2C3.63%2C2.98%2C4.68%2C8.38%2C2.4%2C12.37-1.19%2C2.08-3.1%2C3.69-4.78%2C5.44-2.53%2C2.63-6.11%2C6.82-6.94%2C10.28-.82%2C3.46%2C1.82%2C8.7%2C4.17%2C11.48%2C3.15%2C3.72%2C8.3%2C2.34%2C13.26%2C1.35%2C5.54-1.11%2C11.29-4.43%2C16.42-2.18%2C2.51%2C1.1%2C4.22%2C3.34%2C6.53%2C4.79%2C5.92%2C3.71%2C13.94%2C1.33%2C20.22-1.83%2C4.02-2.03%2C7.98-4.41%2C10.73-7.83%2C1.78-2.22%2C2.91-5.55.93-7.61-.94-.98-2.37-1.4-3.74-1.68-7.2-1.49-14.98-.34-21.34%2C3.17%22%2F%3E%20%3C%2FclipPath%3E%20%3C%2Fdefs%3E%20%3Cg%20class%3D%22cls-2%22%3E%20%3Cg%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%202%22%3E%20%3Cg%20id%3D%22_%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC_1-2%22%20data-name%3D%22%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC%201%22%3E%20%3Cg%3E%20%3Cg%3E%20%3Cpath%20class%3D%22cls-3%22%20d%3D%22M84.16%2C62.88c-.39-3.18-2.88-4.08-5.22-4.6-7.86-1.74-16.37-.39-23.31%2C3.7l-1.68-.48c-4.82-1.34-9.5-3.22-13.9-5.59-2.47-1.33-5.08-3.07-4.48-6.65.26-1.54%2C1.09-2.91%2C2.16-4.04%2C6.37-6.7%2C18.24-9.27%2C18.79-19.56.11-2.09-.36-4.17-1.17-6.11-3.61-8.68-12-14.8-21.15-16.53-9.82-1.86-20.36%2C1.17-28.12%2C7.41-2.46%2C1.98-3.87%2C5.07-3.54%2C8.21.67%2C6.38%2C7.57%2C7.36%2C11.73%2C11.01%2C3.97%2C3.48%2C5.11%2C9.77%2C2.62%2C14.42-1.3%2C2.42-3.38%2C4.3-5.22%2C6.34-2.77%2C3.07-5.06%2C6.68-5.97%2C10.71-.9%2C4.03-.26%2C8.53%2C2.31%2C11.76%2C3.44%2C4.33%2C9.7%2C5.62%2C15.12%2C4.46%2C6.05-1.3%2C12.33-5.16%2C17.94-2.55%2C2.74%2C1.28%2C4.61%2C3.9%2C7.13%2C5.58%2C6.47%2C4.33%2C15.23%2C1.55%2C22.09-2.14%2C4.79-2.57%2C9.49-5.64%2C12.5-10.23%2C1-1.52%2C1.59-3.32%2C1.37-5.13Z%22%2F%3E%20%3Cpath%20class%3D%22cls-4%22%20d%3D%22M86.57%2C62.21c-.96-6.27-8.64-7.05-13.72-7.17-6.45-.15-12.9%2C1.54-18.48%2C4.77l1.93-.25c-4.61-1.31-9.09-2.82-13.38-4.98-1.58-.79-4.09-1.76-4.78-3.44s.74-3.6%2C1.98-4.79c5.4-5.21%2C14-7.69%2C17.46-14.97%2C4.62-9.71-2.8-20.32-10.65-25.74C38.33-.29%2C27.21-1.42%2C17.34%2C1.67c-2.59.81-5.12%2C1.89-7.49%2C3.21-2.24%2C1.25-4.61%2C2.73-6.41%2C4.57C-.11%2C13.08-1.29%2C19.16%2C1.71%2C23.51c2.37%2C3.43%2C6.31%2C4.83%2C9.66%2C7.05s5.06%2C6.25%2C4.1%2C10.23c-.55%2C2.29-2.01%2C4.05-3.59%2C5.74-1.89%2C2.03-3.76%2C4.05-5.29%2C6.38-2.98%2C4.55-4.5%2C10.03-3.37%2C15.44s4.92%2C9.19%2C9.92%2C10.92%2C10.19.83%2C15.12-.79c4.58-1.5%2C9.64-3.58%2C13.8-.06%2C2.02%2C1.71%2C3.83%2C3.7%2C6.22%2C4.9s4.9%2C1.74%2C7.51%2C1.76c5.4.04%2C10.7-2.01%2C15.41-4.49s9.47-5.61%2C12.8-9.98c1.7-2.24%2C2.92-4.84%2C2.66-7.72-.12-1.34-1.06-2.5-2.5-2.5-1.26%2C0-2.62%2C1.15-2.5%2C2.5.25%2C2.77-1.62%2C4.97-3.47%2C6.82s-4.04%2C3.4-6.31%2C4.77c-4.49%2C2.69-9.61%2C5.29-14.93%2C5.58-2.38.13-4.74-.21-6.82-1.41-2.34-1.36-4.06-3.57-6.28-5.11-5.11-3.55-11.12-1.79-16.51%2C0-4.64%2C1.53-9.64%2C2.75-14.24.33s-6.03-7.35-4.99-12.07c.59-2.64%2C1.82-5.01%2C3.38-7.21s3.68-4.08%2C5.43-6.21c3.45-4.2%2C4.83-9.59%2C2.88-14.81-.89-2.4-2.33-4.54-4.33-6.14-1.69-1.36-3.59-2.36-5.47-3.42-.85-.48-1.7-.97-2.48-1.55-.37-.28-1.26-1.12-1.5-1.44-1.19-1.63-1.37-3.89-.5-5.87.98-2.23%2C3.12-3.62%2C5.1-4.88%2C2.22-1.4%2C4.58-2.57%2C7.07-3.43%2C5.05-1.73%2C10.56-2.38%2C15.83-1.38%2C4.75.9%2C9.32%2C2.99%2C12.97%2C6.18s7.05%2C7.64%2C7.49%2C12.48c.19%2C2.05-.24%2C4-1.19%2C5.65-.85%2C1.48-2.07%2C2.73-3.52%2C3.93-2.95%2C2.45-6.77%2C4.42-9.94%2C6.84-4.02%2C3.07-8.36%2C7.97-5.46%2C13.31%2C1.13%2C2.08%2C3.26%2C3.39%2C5.29%2C4.47%2C2.8%2C1.48%2C5.72%2C2.77%2C8.69%2C3.88%2C2.22.82%2C4.49%2C1.56%2C6.79%2C2.15%2C1.51.38%2C2.43-.32%2C3.72-.98%2C1.19-.62%2C2.41-1.14%2C3.68-1.58%2C5.26-1.82%2C11.06-2.27%2C16.5-.98%2C1.87.44%2C2.89.8%2C3.2%2C2.79.2%2C1.34%2C1.88%2C2.07%2C3.08%2C1.75%2C1.43-.39%2C1.95-1.74%2C1.75-3.08Z%22%2F%3E%20%3C%2Fg%3E%20%3Cg%20class%3D%22cls-5%22%3E%20%3Cg%20class%3D%22cls-7%22%3E%20%3Cg%3E%20%3Cpath%20class%3D%22cls-6%22%20d%3D%22M43.39%2C38.05c-1.94.44-3.95.19-5.93.03s-4.04-.21-5.86.57-3.32%2C2.65-3.08%2C4.62c.26%2C2.18%2C2.42%2C3.6%2C4.48%2C4.37%22%2F%3E%20%3Cpath%20class%3D%22cls-6%22%20d%3D%22M6.42%2C56.6c3.23-1.64%2C7.72.32%2C8.72%2C3.79.77%2C2.67-.36%2C5.56-2.03%2C7.77s-3.87%2C3.98-5.7%2C6.07%22%2F%3E%20%3Cpath%20class%3D%22cls-6%22%20d%3D%22M27.1%2C76.17c-1.22-3.92.21-8.94%2C4.04-10.44%2C2.51-.98%2C5.61-.12%2C7.26%2C2.01s1.7%2C5.35.13%2C7.53%22%2F%3E%20%3Cpath%20class%3D%22cls-6%22%20d%3D%22M64.09%2C60.14c-.57%2C1.78-.83%2C3.65-.77%2C5.51.02.54.08%2C1.14.48%2C1.51.31.29.75.37%2C1.17.42%2C5.95.72%2C12.14-3.06%2C14.22-8.68%22%2F%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E' },
+];
+
+/* ---- たまご ---- */
+const EGG_FILL='M63.02,5.01c-5.05.24-9.05,1.86-13.41,4.56-6.95,4.3-12.89,10.01-17.87,16.48-7.48,9.72-13.66,20.37-19.05,31.37C5.54,72.03-.34,88.6,3.82,104.32c3.78,14.31,15.67,25.59,29.39,31.16s29.05,6,43.72,4.01c16.97-2.3,34.37-8.31,45.47-21.36,11.59-13.61,14.49-33.21,10.51-50.64-4.55-19.93-17.13-37.31-31.24-51.83-4.04-4.16-8.77-7.6-14.03-10.03-6.32-2.92-11.67-4.2-17.51-2.08-2.29.83-4.69,1.35-7.11,1.47Z';
+const EGG_INK='M63.02,2.51c-7.33.41-13.69,3.81-19.44,8.19s-10.93,9.94-15.39,15.93-8.74,12.77-12.47,19.55-7.2,13.73-10.06,20.92C.18,80.87-2.63,96.44,3.34,110.55c4.99,11.8,15.14,21.08,26.72,26.28,14,6.3,29.77,7.22,44.85,5.41,13.33-1.6,26.86-5.1,38.16-12.62s19.18-18.95,22.32-32.23,1.79-27.34-2.89-40.12c-4.91-13.39-12.97-25.33-22.28-36.04-4.68-5.38-9.56-10.67-15.57-14.59-3.2-2.09-6.68-3.78-10.27-5.06-3.35-1.2-6.97-1.88-10.53-1.45s-7.06,2.16-10.81,2.38c-3.2.19-3.22,5.19,0,5,1.89-.11,3.78-.39,5.6-.87s3.57-1.29,5.47-1.54c3.2-.43,6.38.35,9.37,1.46,6.38,2.37,12.01,6.3,16.73,11.17,9.24,9.53,17.58,20.07,23.58,31.96s9.09,24.37,8.16,37.36c-.87,12.21-5.62,24.15-14.5,32.73-8.96,8.66-20.98,13.36-33,15.9-13.66,2.89-28.36,3.61-41.98.19-11.8-2.96-23-9.46-30.15-19.5-3.54-4.98-5.93-10.57-6.9-16.62-1.13-7-.2-14.23,1.63-21.02s4.67-13.59,7.83-20.03,6.75-13.07,10.67-19.3c7.29-11.6,16.11-23.28,28.67-29.52,2.77-1.38,5.75-2.18,8.83-2.36s3.22-5.18,0-5Z';
+function eggSVG(uid){
+  return `<svg class="egg-svg" viewBox="0 0 137.08 143.06">
+  <defs><clipPath id="${uid}"><path d="${EGG_FILL}"/></clipPath></defs>
+  <path fill="#fff" d="${EGG_FILL}"/>
+  <image class="peek" clip-path="url(#${uid})" x="20" y="32" width="97" height="94" preserveAspectRatio="xMidYMid meet"/>
+  <path fill="#231815" d="${EGG_INK}"/>
+  <g clip-path="url(#${uid})">
+    <path class="cr" d="M30 78 L48 70 L42 90 L62 80 L56 100 L78 91"/>
+    <path class="cr" d="M110 64 L92 75 L103 87 L84 95 L95 110"/>
+    <path class="cr" d="M34 112 L55 104 L49 121 L72 113 L66 129"/>
+  </g>
+  <g class="drip d1" transform="translate(52,110)">
+    <path fill="none" stroke="#231815" stroke-width="3" stroke-linecap="round" d="M-9,-2 L-2,-6 L4,-1 L11,-5"/>
+    <path fill="#F8B62D" stroke="#231815" stroke-width="2.6" stroke-linejoin="round"
+      d="M1,-2c4,7 6,11 6,15a6,6 0 0 1 -12,0c0,-4 2,-8 6,-15z"/>
+  </g>
+  <g class="drip d2" transform="translate(92,118)">
+    <path fill="none" stroke="#231815" stroke-width="3" stroke-linecap="round" d="M-8,-3 L-1,-7 L5,-2 L10,-6"/>
+    <path fill="#F8B62D" stroke="#231815" stroke-width="2.6" stroke-linejoin="round"
+      d="M1,-3c3,6 5,9 5,13a5,5 0 0 1 -10,0c0,-4 2,-7 5,-13z"/>
+  </g>
+</svg>`;
+}
+
+/* ---- 目と口 ---- */
+const FACE_HTML = `<svg class="face-svg" viewBox="0 0 29.22 19.63">
+  <g class="eyes">
+    <ellipse cx="2.87" cy="3.52" rx="2.87" ry="3.13"/>
+    <ellipse cx="26.35" cy="3.13" rx="2.87" ry="3.13"/>
+  </g>
+  <g class="beak">
+    <path fill="#f8b62d" d="M9.71,12.67c1.71-.29,3.98-.25,5.75.05,1.86.53.44,2.08-.65,3.31-.85.99-1.81,2.15-2.74,2.1-1.2-.11-1.75-1.42-2.36-2.31-.6-.98-1.58-2.6-.1-3.12l.1-.03Z"/>
+    <path fill="#231815" d="M12.14,19.63s-.09,0-.14,0c-1.78-.16-2.65-1.56-3.22-2.49-.1-.16-.2-.32-.3-.47-.58-.95-1.5-2.43-.99-3.84.18-.51.61-1.18,1.64-1.54l.34-.1c1.82-.31,4.27-.29,6.25.05l.16.04c1.27.36,1.74,1.12,1.9,1.69.44,1.5-.75,2.83-1.8,4.01l-.11.13c-1.02,1.19-2.17,2.53-3.73,2.53ZM10.46,14.08c.16.35.42.78.53.96.08.12.21.32.33.52.22.35.57.92.8,1.05.37-.19,1.08-1.01,1.46-1.46l.08-.09c.24-.27.57-.64.82-.96-1.32-.16-2.82-.16-4.03-.02Z"/>
+  </g>
+</svg>`;
+
+/* ---- 音 ---- */
+const Sound = (()=>{
+  let ctx=null, master=null, noise=null, on=true;
+  try{ on = localStorage.getItem('surikomi-sound') !== 'off'; }catch(e){}
+  function init(){
+    if(!ctx){
+      const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+      ctx=new AC(); master=ctx.createGain(); master.gain.value=.5; master.connect(ctx.destination);
+      const len=Math.floor(ctx.sampleRate*.4); noise=ctx.createBuffer(1,len,ctx.sampleRate);
+      const d=noise.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    }
+    if(ctx.state==='suspended') ctx.resume();
+  }
+  function chirp(base=1120,dur=.13,vol=.5){
+    if(!on||!ctx) return;
+    const t=ctx.currentTime, o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='triangle';
+    o.frequency.setValueAtTime(base,t);
+    o.frequency.exponentialRampToValueAtTime(base*2.15,t+dur*.26);
+    o.frequency.exponentialRampToValueAtTime(base*1.12,t+dur);
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+.014);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    const lfo=ctx.createOscillator(), lg=ctx.createGain();
+    lfo.frequency.value=42; lg.gain.value=base*.07;
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t+dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+.03);
+  }
+  function burst(f,q,dur,vol){
+    if(!on||!ctx) return;
+    const t=ctx.currentTime, s=ctx.createBufferSource(), bp=ctx.createBiquadFilter(), g=ctx.createGain();
+    s.buffer=noise; bp.type='bandpass'; bp.frequency.value=f; bp.Q.value=q;
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    s.connect(bp); bp.connect(g); g.connect(master); s.start(t); s.stop(t+dur+.02);
+  }
+  return {
+    init, chirp,
+    piyo(h){ chirp(1150,.12,.45); setTimeout(()=>chirp(h?1320:980,.15,.42),155); },
+    tok(){ burst(2400,3,.05,.28); },
+    crack(){ burst(1500,1.4,.16,.4); burst(600,2,.1,.22); },
+    splat(){
+      if(!on||!ctx) return;
+      burst(420,.7,.34,.5); burst(180,.6,.5,.42);
+      const t=ctx.currentTime, o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(320,t);
+      o.frequency.exponentialRampToValueAtTime(60,t+.35);
+      g.gain.setValueAtTime(.35,t); g.gain.exponentialRampToValueAtTime(.0001,t+.4);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t+.42);
+    },
+    hatch(){ [900,1150,1450,1850].forEach((f,i)=>setTimeout(()=>chirp(f,.13,.45),i*95)); },
+    get on(){return on;},
+    toggle(){ on=!on; init(); try{localStorage.setItem('surikomi-sound',on?'on':'off');}catch(e){}
+      if(on) chirp(1200,.1,.4); return on; }
+  };
+})();
+
+/* 大きすぎる画像はブラウザの描画（とくに SVG 内のぼかし）を壊すので、
+   取り込んだ時点で扱いやすいサイズに落としておく。失敗しても元の画像で続行する。 */
+function rasterize(src,max,mime,quality){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>{
+      try{
+        const nw=im.naturalWidth||max, nh=im.naturalHeight||max;
+        const s=Math.min(1,max/Math.max(nw,nh));
+        const c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(nw*s)); c.height=Math.max(1,Math.round(nh*s));
+        const g=c.getContext('2d');
+        g.drawImage(im,0,0,c.width,c.height);
+        res(c.toDataURL(mime,quality));
+      }catch(e){ res(src); }
+    };
+    im.onerror=()=>res(src);
+    im.src=src;
+  });
+}
+/* たまごの中に透ける用の小さい画像 */
+let peekToken=0;
+function setPeek(src,el){
+  const my=++peekToken;
+  el.setAttribute('href',src);
+  rasterize(src,320,'image/png').then(small=>{
+    if(my===peekToken) el.setAttribute('href',small);
+  });
+}
+
+const $=id=>document.getElementById(id);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const screenStart=$('screenStart'), screenCut=$('screenCut'), screenStage=$('screenStage');
+let state='start';
+function show(el){ [screenStart,screenCut,screenStage].forEach(s=>s.classList.toggle('is-on', s===el)); }
+
+/* たまご2つと顔2つを組み立てる */
+$('eggPreview').innerHTML=eggSVG('eggClipA');
+$('eggMain').innerHTML=eggSVG('eggClipB');
+$('facePreview').innerHTML=FACE_HTML;
+$('faceLive').innerHTML=FACE_HTML;
+const peekPreview=$('eggPreview').querySelector('.peek');
+const peekMain=$('eggMain').querySelector('.peek');
+const CRACKS=[...$('eggMain').querySelectorAll('.cr')];
+
+/* =====================================================================
+   1. なかみをえらぶ
+   ===================================================================== */
+const picks=$('picks'), pickFile=$('pickFile'), fileInput=$('fileInput');
+const goBtn=$('goBtn'), goNote=$('goNote');
+let rawSrc=null, fromPhone=false;
+
+CONTENTS.forEach(p=>{
+  const b=document.createElement('button');
+  b.className='pick'; b.type='button';
+  b.style.backgroundImage=`url("${p.src}")`;
+  b.setAttribute('aria-label',p.name);
+  b.addEventListener('click',()=>choose(p.src,b,false));
+  picks.insertBefore(b,pickFile);
+});
+function choose(src,el,phone){
+  rawSrc=src; fromPhone=phone;
+  document.querySelectorAll('.pick').forEach(p=>p.classList.remove('is-picked'));
+  if(el) el.classList.add('is-picked');
+  setPeek(src,peekPreview);
+  goBtn.disabled=false;
+  goNote.textContent = phone ? 'つぎで、好きな形に切り抜けます' : 'つぎで、顔の位置を決められます';
+  Sound.init();
+}
+fileInput.addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    rasterize(r.result,1600,'image/jpeg',.9).then(small=>{
+      pickFile.style.backgroundImage=`url("${small}")`;
+      pickFile.classList.add('has-photo');
+      choose(small,pickFile,true);
+    });
+  };
+  r.readAsDataURL(f);
+});
+goBtn.addEventListener('click',()=>{
+  if(fromPhone) openCut();
+  else { bodySrc=rawSrc; show(screenCut); state='cut'; toFaceMode(false); }
+});
+
+/* =====================================================================
+   2. 切り抜き → 顔をおく
+   ===================================================================== */
+const cutBox=$('cutBox'), cutImg=$('cutImg'), cutCanvas=$('cutCanvas');
+const cutTitle=$('cutTitle'), cutSub=$('cutSub'), cutRow=$('cutRow'), faceRow=$('faceRow');
+const undoBtn=$('undoBtn'), skipBtn=$('skipBtn'), backBtn=$('backBtn');
+const faceBackBtn=$('faceBackBtn'), noFaceBtn=$('noFaceBtn'), cutOkBtn=$('cutOkBtn');
+const faceBox=$('faceBox'), faceImg=$('faceImg'), facePreview=$('facePreview');
+const sizeRow=$('sizeRow'), faceSize=$('faceSize');
+const ctx2=cutCanvas.getContext('2d');
+
+let srcImg=new Image(), bodySrc=null, bodyImg=new Image();
+let path=[], drawing=false, cutMode='cut';
+let face={x:.5,y:.4,unit:.55};
+let useFace=true;
+
+function openCut(){
+  cutMode='cut'; path=[]; drawing=false;
+  show(screenCut); state='cut';
+  faceBox.hidden=true; cutBox.hidden=false;
+  sizeRow.hidden=true; faceRow.hidden=true; cutRow.hidden=false;
+  cutTitle.textContent='指でなぞって切り抜く';
+  cutSub.textContent='囲んだ内側が、生まれてくる子になります';
+  cutOkBtn.textContent='切り抜く'; cutOkBtn.disabled=true; undoBtn.disabled=true;
+  srcImg=new Image(); srcImg.onload=layoutCut; srcImg.src=rawSrc;
+  cutImg.src=rawSrc;
+}
+function fitBox(box,natW,natH){
+  const area=box.parentElement.getBoundingClientRect();
+  const maxW=Math.min(area.width||320,560), maxH=Math.max(150,area.height||240);
+  const s=Math.min(maxW/natW,maxH/natH);
+  const w=Math.max(60,Math.round(natW*s)), h=Math.max(60,Math.round(natH*s));
+  box.style.width=w+'px'; box.style.height=h+'px';
+  return {w,h};
+}
+function layoutCut(){
+  if(!srcImg.naturalWidth) return;
+  const {w,h}=fitBox(cutBox,srcImg.naturalWidth,srcImg.naturalHeight);
+  const dpr=Math.min(2,devicePixelRatio||1);
+  cutCanvas.width=Math.round(w*dpr); cutCanvas.height=Math.round(h*dpr);
+  ctx2.setTransform(dpr,0,0,dpr,0,0);
+  paintCut();
+}
+function tracePath(g,pts,w,h){
+  g.beginPath();
+  g.moveTo(pts[0].x*w,pts[0].y*h);
+  for(let i=1;i<pts.length-1;i++){
+    const a=pts[i], b=pts[i+1];
+    g.quadraticCurveTo(a.x*w,a.y*h,(a.x+b.x)/2*w,(a.y+b.y)/2*h);
+  }
+  const last=pts[pts.length-1];
+  g.lineTo(last.x*w,last.y*h);
+}
+function paintCut(){
+  const w=cutCanvas.clientWidth, h=cutCanvas.clientHeight;
+  ctx2.clearRect(0,0,w,h);
+  const scrim=getComputedStyle(document.documentElement).getPropertyValue('--scrim').trim()||'rgba(35,24,21,.66)';
+  ctx2.fillStyle=scrim; ctx2.fillRect(0,0,w,h);
+  if(path.length>1){
+    ctx2.save();
+    ctx2.globalCompositeOperation='destination-out';
+    tracePath(ctx2,path,w,h); ctx2.closePath(); ctx2.fill();
+    ctx2.restore();
+    ctx2.save();
+    tracePath(ctx2,path,w,h);
+    if(!drawing) ctx2.closePath();
+    ctx2.strokeStyle='#FFF100'; ctx2.lineWidth=3;
+    ctx2.lineJoin='round'; ctx2.lineCap='round';
+    ctx2.setLineDash(drawing?[]:[7,5]);
+    ctx2.stroke();
+    ctx2.restore();
+  }
+}
+function pos(e){
+  const r=cutCanvas.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width, y:(e.clientY-r.top)/r.height};
+}
+cutCanvas.addEventListener('pointerdown',e=>{
+  if(cutMode!=='cut') return;
+  cutCanvas.setPointerCapture(e.pointerId);
+  drawing=true; path=[pos(e)]; paintCut(); Sound.init();
+});
+cutCanvas.addEventListener('pointermove',e=>{
+  if(!drawing) return;
+  const p=pos(e), last=path[path.length-1];
+  if(Math.hypot(p.x-last.x,p.y-last.y)<.006) return;
+  path.push(p); paintCut();
+});
+function endDraw(){
+  if(!drawing) return;
+  drawing=false; paintCut();
+  const ok=path.length>=8;
+  cutOkBtn.disabled=!ok; undoBtn.disabled=false;
+  if(ok) Sound.tok();
+}
+cutCanvas.addEventListener('pointerup',endDraw);
+cutCanvas.addEventListener('pointercancel',endDraw);
+undoBtn.addEventListener('click',()=>{ path=[]; paintCut(); cutOkBtn.disabled=true; undoBtn.disabled=true; });
+backBtn.addEventListener('click',()=>{ show(screenStart); state='start'; });
+skipBtn.addEventListener('click',()=>{ bodySrc=rawSrc; toFaceMode(false); });
+faceBackBtn.addEventListener('click',()=>{
+  if(fromPhone) openCut(); else { show(screenStart); state='start'; }
+});
+cutOkBtn.addEventListener('click',()=>{ cutMode==='cut' ? applyCut() : startIncubation(); });
+
+function applyCut(){
+  const NW=srcImg.naturalWidth, NH=srcImg.naturalHeight;
+  let minX=1,minY=1,maxX=0,maxY=0;
+  path.forEach(p=>{ minX=Math.min(minX,p.x); minY=Math.min(minY,p.y);
+                    maxX=Math.max(maxX,p.x); maxY=Math.max(maxY,p.y); });
+  minX=Math.max(0,minX); minY=Math.max(0,minY);
+  maxX=Math.min(1,maxX); maxY=Math.min(1,maxY);
+  const bw=(maxX-minX)*NW, bh=(maxY-minY)*NH;
+  if(bw<12||bh<12){ bodySrc=rawSrc; toFaceMode(false); return; }
+  const s=Math.min(1,760/Math.max(bw,bh));
+  const c=document.createElement('canvas');
+  c.width=Math.max(8,Math.round(bw*s)); c.height=Math.max(8,Math.round(bh*s));
+  const g=c.getContext('2d');
+  g.save(); g.scale(s,s); g.translate(-minX*NW,-minY*NH);
+  tracePath(g,path,NW,NH); g.closePath(); g.clip();
+  g.drawImage(srcImg,0,0,NW,NH);
+  g.restore();
+  try{ bodySrc=c.toDataURL('image/png'); autoFace(c); toFaceMode(true); }
+  catch(err){ bodySrc=rawSrc; toFaceMode(false); }
+}
+function autoFace(c){
+  try{
+    const g=c.getContext('2d'), w=c.width, h=c.height;
+    const d=g.getImageData(0,0,w,h).data;
+    const top=Math.max(2,Math.floor(h*.58));
+    let sx=0,sy=0,n=0;
+    for(let y=0;y<top;y+=2) for(let x=0;x<w;x+=2){
+      if(d[(y*w+x)*4+3]>128){ sx+=x; sy+=y; n++; }
+    }
+    if(n>40){
+      let fx=sx/n, fy=sy/n;
+      if(d[((Math.floor(fy)*w)+Math.floor(fx))*4+3]<=128){ fx=w/2; fy=top*.6; }
+      face.x=fx/w; face.y=fy/h;
+    }else{ face.x=.5; face.y=.4; }
+  }catch(e){ face.x=.5; face.y=.4; }
+}
+
+function toFaceMode(wasCut){
+  cutMode='face';
+  if(!wasCut){ face.x=.5; face.y=.4; }
+  cutBox.hidden=true; faceBox.hidden=false;
+  cutRow.hidden=true; faceRow.hidden=false; sizeRow.hidden=false;
+  cutTitle.textContent='顔の位置を決める';
+  cutOkBtn.textContent='あたためる'; cutOkBtn.disabled=false;
+  syncFaceUI();
+  bodyImg=new Image();
+  bodyImg.onload=()=>{ layoutFaceBox(); Sound.piyo(); };
+  bodyImg.src=bodySrc;
+  faceImg.src=bodySrc;
+}
+function layoutFaceBox(){
+  if(!bodyImg.naturalWidth) return;
+  fitBox(faceBox,bodyImg.naturalWidth,bodyImg.naturalHeight);
+  drawFacePreview();
+}
+function drawFacePreview(){
+  const w=faceBox.clientWidth, h=faceBox.clientHeight;
+  facePreview.style.left=(face.x*w)+'px';
+  facePreview.style.top=(face.y*h)+'px';
+  facePreview.style.setProperty('--fw',(Math.min(w,h)*face.unit)+'px');
+}
+function syncFaceUI(){
+  facePreview.hidden=!useFace;
+  sizeRow.hidden=!useFace;
+  noFaceBtn.textContent = useFace ? '目と口をつけない' : '目と口をつける';
+  noFaceBtn.setAttribute('aria-pressed', String(!useFace));
+  faceBox.style.cursor = useFace ? 'grab' : 'default';
+  cutSub.textContent = useFace
+    ? 'ドラッグで動かして、スライダーで大きさを変えられます'
+    : 'このまま、目と口なしで生まれます';
+}
+noFaceBtn.addEventListener('click',()=>{ useFace=!useFace; syncFaceUI(); Sound.tok(); });
+
+let dragging=false;
+faceBox.addEventListener('dragstart',e=>e.preventDefault());
+faceBox.addEventListener('pointerdown',e=>{
+  if(!useFace) return;
+  e.preventDefault();
+  dragging=true; faceBox.setPointerCapture(e.pointerId); moveFace(e);
+});
+faceBox.addEventListener('pointermove',e=>{ if(dragging){ e.preventDefault(); moveFace(e); } });
+faceBox.addEventListener('pointerup',()=>{dragging=false;});
+faceBox.addEventListener('pointercancel',()=>{dragging=false;});
+function moveFace(e){
+  if(!useFace) return;
+  const r=faceBox.getBoundingClientRect();
+  face.x=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  face.y=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+  drawFacePreview();
+}
+faceSize.addEventListener('input',()=>{ face.unit=faceSize.value/100; drawFacePreview(); });
+face.unit=faceSize.value/100;
+
+/* =====================================================================
+   3. たまご → ふ化
+   ===================================================================== */
+const eggHome=$('eggHome'), eggMain=$('eggMain'), field=$('field');
+const statusEl=$('status'), hintEl=$('hint'), hud=$('hud'), bond=$('bond'), flash=$('flash');
+const TOTAL=10;              /* ← ふ化までの秒数（つついても早くなりません） */
+const STAGES=[.34,.60,.85];
+const BREAK_AT=4;            /* ← これだけつつくと割れて生卵になる */
+const HEAL=.15;              /* 1秒あたり、つついたダメージが回復する量 */
+const splat=$('splat'), againBtn=$('againBtn'), flashBig=$('flashBig'), flashSub=$('flashSub');
+const DRIPS=[...$('eggMain').querySelectorAll('.drip')];
+let warm=0, wobT=0, crackStage=0, lastT=0, damage=0, jolt=0, statusTimer=null;
+
+function setStatus(txt){
+  statusEl.textContent=txt;
+  statusEl.animate([{opacity:0},{opacity:1}],{duration:260});
+}
+function normalStatus(){
+  return ['あたためています','もぞもぞ動いている','ヒビが入った','いま、出てくる'][crackStage];
+}
+
+function startIncubation(){
+  Sound.init();
+  setPeek(bodySrc,peekMain);
+  chickPhoto.src=bodySrc;
+  show(screenStage);
+  eggMain.getAnimations().forEach(a=>a.cancel());
+  warm=0; wobT=0; crackStage=0;
+  CRACKS.forEach(c=>c.classList.remove('on'));
+  eggMain.style.opacity='1'; eggMain.style.transform='';
+  eggHome.hidden=false; chickEl.hidden=true;
+  splat.hidden=true; splat.innerHTML=''; againBtn.hidden=true;
+  damage=0; jolt=0;
+  DRIPS.forEach(d=>d.classList.remove('on'));
+  clearTimeout(statusTimer);
+  statusEl.textContent='あたためています'; statusEl.style.opacity='1';
+  hintEl.textContent='そっとしておくと、生まれます'; hintEl.style.opacity='1';
+  hud.classList.remove('on');
+  state='egg'; lastT=performance.now();
+}
+eggMain.addEventListener('pointerdown',e=>{
+  if(state!=='egg') return;
+  e.stopPropagation();
+  damage+=1; jolt=1; Sound.tok();
+  const lv=Math.min(3,Math.floor(damage));
+  DRIPS[0].classList.toggle('on', damage>=2);
+  DRIPS[1].classList.toggle('on', damage>=3);
+  if(damage>=BREAK_AT){ breakEgg(); return; }
+  setStatus(['','ゆれた。そっとしておこう','なかみが揺さぶられている','われる。もうやめて'][lv]);
+  clearTimeout(statusTimer);
+  statusTimer=setTimeout(()=>{ if(state==='egg') setStatus(normalStatus()); },1900);
+  eggMain.animate([{transform:'scale(1) rotate(0deg)'},{transform:'scale(.9,1.1) rotate(-6deg)'},
+    {transform:'scale(1.06,.94) rotate(5deg)'},{transform:'scale(1) rotate(0deg)'}],
+    {duration:300,easing:'ease-out'});
+});
+function eggFrame(dt){
+  warm=Math.min(warm+dt,TOTAL);
+  damage=Math.max(0,damage-HEAL*dt);
+  if(damage<2) DRIPS[0].classList.remove('on');
+  if(damage<3) DRIPS[1].classList.remove('on');
+  jolt=Math.max(0,jolt-dt*2.2);
+  const p=warm/TOTAL;
+  wobT+=dt*(2.4+p*7);
+  const amp=(reduce?1:1.2)+p*(reduce?2:5.5)+jolt*(reduce?1:4);
+  eggMain.style.transform=`rotate(${Math.sin(wobT)*amp}deg) translateY(${Math.abs(Math.sin(wobT*2))*p*-4}px)`;
+  peekMain.style.opacity=String(.2+p*.34);
+  while(crackStage<3 && p>=STAGES[crackStage]){
+    CRACKS[crackStage].classList.add('on'); crackStage++;
+    Sound.crack();
+    clearTimeout(statusTimer);
+    setStatus(normalStatus());
+  }
+  if(p>=1) hatch();
+}
+
+/* つつきすぎて割れたとき */
+function breakEgg(){
+  state='broken';
+  clearTimeout(statusTimer);
+  Sound.splat();
+  CRACKS.forEach(c=>c.classList.add('on'));
+  const r=eggMain.getBoundingClientRect(), f=field.getBoundingClientRect();
+  const cx=r.left+r.width/2-f.left, cy=r.top+r.height/2-f.top;
+  shatter(reduce?5:12, .55);
+  eggMain.animate([
+    {transform:'scale(1.08,.9)',opacity:1},
+    {transform:'scale(.7,1.05)',opacity:0}
+  ],{duration:260,easing:'ease-in',fill:'forwards'});
+  statusEl.style.opacity='0'; hintEl.style.opacity='0';
+  setTimeout(()=>{
+    eggHome.hidden=true;
+    splat.style.left=cx+'px';
+    splat.style.top=(cy+r.height*.22)+'px';
+    splat.style.setProperty('--sw', Math.round(r.width*1.5)+'px');
+    splat.innerHTML=SPLAT_HTML;
+    splat.hidden=false;
+    splat.animate([
+      {transform:'translate(-50%,-50%) scale(.2,.5)',opacity:0},
+      {transform:'translate(-50%,-50%) scale(1.14,.86)',opacity:1,offset:.45},
+      {transform:'translate(-50%,-50%) scale(.97,1.04)',offset:.72},
+      {transform:'translate(-50%,-50%) scale(1,1)'}
+    ],{duration:620,easing:'cubic-bezier(.3,1.1,.4,1)'});
+    flashBig.textContent='生卵'; flashSub.textContent='つつきすぎた';
+    flash.animate([
+      {opacity:0,transform:'translate(-50%,-50%) scale(.6)'},
+      {opacity:1,transform:'translate(-50%,-50%) scale(1)',offset:.22},
+      {opacity:1,transform:'translate(-50%,-56%) scale(1)',offset:.66},
+      {opacity:0,transform:'translate(-50%,-62%) scale(1.03)'}
+    ],{duration:2000,easing:'cubic-bezier(.2,.9,.3,1)'});
+    setTimeout(()=>{ againBtn.hidden=false;
+      againBtn.animate([{opacity:0},{opacity:1}],{duration:400}); },1500);
+  },240);
+}
+const SPLAT_HTML=`<svg viewBox="0 0 220 132" aria-label="生卵">
+  <g fill="#fff" stroke="#231815" stroke-width="5" stroke-linejoin="round">
+    <path d="M22,80C14,60 36,42 64,38 84,35 88,20 106,22c17,2 20,15 42,19 28,5 50,20 44,40-6,19-42,31-84,31C66,112 30,99 22,80Z"/>
+    <circle cx="14" cy="104" r="7"/><circle cx="205" cy="96" r="6"/>
+    <circle cx="52" cy="22" r="5.5"/><circle cx="168" cy="16" r="4.5"/>
+  </g>
+  <ellipse cx="112" cy="70" rx="30" ry="25" fill="#F8B62D" stroke="#231815" stroke-width="5"/>
+</svg>`;
+function shatter(n,power){
+  for(let i=0;i<n;i++){
+    const s=document.createElement('div'); s.className='shard';
+    const sz=9+Math.random()*12;
+    s.style.width=sz+'px'; s.style.height=(sz*.85)+'px';
+    eggHome.appendChild(s);
+    const ang=(i/n)*Math.PI*2+Math.random()*.5, dist=(70+Math.random()*130)*power;
+    s.animate([
+      {transform:'translate(-50%,-50%) rotate(0deg)',opacity:1},
+      {transform:`translate(${Math.cos(ang)*dist-8}px,${Math.sin(ang)*dist*.8-40*power}px) rotate(${Math.random()*720-360}deg)`,opacity:1,offset:.55},
+      {transform:`translate(${Math.cos(ang)*dist*1.15-8}px,${Math.sin(ang)*dist*.8+180}px) rotate(${Math.random()*900-450}deg)`,opacity:0}
+    ],{duration:1100+Math.random()*500,easing:'cubic-bezier(.2,.7,.4,1)',fill:'forwards'});
+    setTimeout(()=>s.remove(),1700);
+  }
+}
+function hatch(){
+  state='hatch'; Sound.hatch();
+  const r=eggMain.getBoundingClientRect(), f=field.getBoundingClientRect();
+  const cx=r.left+r.width/2-f.left, cy=r.top+r.height/2-f.top;
+  shatter(reduce?6:14,1);
+  eggMain.animate([{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.82)'}],
+    {duration:320,easing:'ease-in',fill:'forwards'});
+  statusEl.style.opacity='0'; hintEl.style.opacity='0';
+  setTimeout(()=>{ eggHome.hidden=true; startPlay(cx,cy); },300);
+  flashBig.textContent='ピヨ'; flashSub.textContent='すりこみ完了';
+  flash.animate([
+    {opacity:0,transform:'translate(-50%,-50%) scale(.6)'},
+    {opacity:1,transform:'translate(-50%,-50%) scale(1)',offset:.22},
+    {opacity:1,transform:'translate(-50%,-56%) scale(1)',offset:.62},
+    {opacity:0,transform:'translate(-50%,-64%) scale(1.04)'}
+  ],{duration:1900,easing:'cubic-bezier(.2,.9,.3,1)'});
+}
+
+/* =====================================================================
+   4. あそぶ
+   ===================================================================== */
+const chickEl=$('chick'), chickBody=$('chickBody'), chickPhoto=$('chickPhoto');
+const chickShadow=$('chickShadow'), faceLive=$('faceLive');
+const eyesLive=faceLive.querySelector('.eyes');
+const chick={x:0,y:0,tx:0,ty:0,phase:0,lean:0,bob:0,walking:false,w:0,h:0,look:{x:0,y:0}};
+let bondVal=0, idleT=0, userT=0, lastChirp=0, lastZ=0;
+let maxed=false, blinking=false, sleeping=false;
+const SLEEP_AT=14;   /* ← 何秒ほっとくと寝るか */
+
+function sizeChick(){
+  const base=Math.max(110,Math.min(196,Math.min(innerWidth,innerHeight)*.31));
+  const nw=bodyImg.naturalWidth||1, nh=bodyImg.naturalHeight||1;
+  const s=base/Math.max(nw,nh);
+  chick.w=Math.max(40,Math.round(nw*s)); chick.h=Math.max(40,Math.round(nh*s));
+  chickBody.style.width=chick.w+'px'; chickBody.style.height=chick.h+'px';
+  chickBody.style.left=(-chick.w/2)+'px'; chickBody.style.top=(-chick.h/2)+'px';
+  faceLive.hidden=!useFace;
+  faceLive.style.left=(face.x*chick.w)+'px';
+  faceLive.style.top=(face.y*chick.h)+'px';
+  faceLive.style.setProperty('--fw',(Math.min(chick.w,chick.h)*face.unit)+'px');
+  chickShadow.style.width=(chick.w*.58)+'px';
+  chickShadow.style.height=Math.max(8,chick.h*.11)+'px';
+  chickShadow.style.top=(chick.h/2-3)+'px';
+}
+function startPlay(cx,cy){
+  chickPhoto.src=bodySrc;
+  sizeChick();
+  chick.x=cx; chick.y=cy; chick.tx=cx; chick.ty=cy;
+  chickEl.hidden=false; place();
+  chickBody.animate([
+    {transform:'scale(0) translateY(30px)'},
+    {transform:'scale(1.2) translateY(-14px)',offset:.45},
+    {transform:'scale(.93) translateY(4px)',offset:.72},
+    {transform:'scale(1) translateY(0)'}
+  ],{duration:750,easing:'cubic-bezier(.3,1.2,.4,1)'});
+  setTimeout(()=>{ Sound.piyo(); doChirp(); },260);
+  state='play'; bondVal=0; maxed=false; idleT=0; userT=0; sleeping=false;
+  bond.style.width='0%';
+  hud.classList.add('on');
+  setTimeout(()=>{ hintEl.textContent='画面をタップすると、ついてきます'; hintEl.style.opacity='1'; },1700);
+}
+function place(){ chickEl.style.transform=`translate(${chick.x}px,${chick.y}px)`; }
+function setTarget(x,y){
+  const px=chick.w/2+10, py=chick.h/2+10;
+  chick.tx=Math.max(px,Math.min(innerWidth-px,x));
+  chick.ty=Math.max(py+44,Math.min(innerHeight-py-14,y));
+  idleT=0;
+}
+screenStage.addEventListener('pointerdown',e=>{
+  if(state!=='play') return;
+  e.preventDefault();
+  Sound.init();
+  userT=0;
+  if(sleeping){ wake(); return; }
+  const f=field.getBoundingClientRect();
+  setTarget(e.clientX-f.left,e.clientY-f.top);
+  hintEl.style.opacity='0';
+});
+hud.addEventListener('pointerdown',e=>e.stopPropagation());
+addEventListener('pointermove',e=>{
+  if(state!=='play'||e.pointerType!=='mouse') return;
+  const f=field.getBoundingClientRect();
+  chick.look.x=e.clientX-f.left; chick.look.y=e.clientY-f.top;
+});
+function fallAsleep(){
+  sleeping=true; lastZ=0;
+  chickBody.animate([{transform:'scale(1,1)'},{transform:'scale(1.05,.95)'},{transform:'scale(1,1)'}],
+    {duration:600,easing:'ease-in-out'});
+  hintEl.textContent='すやすや。タップで起きます';
+  hintEl.style.opacity='1';
+}
+function wake(){
+  if(!sleeping) return;
+  sleeping=false; userT=0;
+  hintEl.style.opacity='0';
+  hop(); doChirp(); Sound.piyo();
+}
+function zzz(){
+  const z=document.createElement('div');
+  z.className='zzz'; z.textContent='Z';
+  z.style.fontSize=Math.round(Math.max(13,chick.h*.16))+'px';
+  z.style.left=(chick.x+chick.w*.3)+'px';
+  z.style.top=(chick.y-chick.h*.45)+'px';
+  field.appendChild(z);
+  z.animate([
+    {transform:'translate(0,0) rotate(-8deg) scale(.5)',opacity:0},
+    {transform:'translate(16px,-22px) rotate(6deg) scale(1)',opacity:.6,offset:.35},
+    {transform:'translate(38px,-62px) rotate(14deg) scale(1.1)',opacity:0}
+  ],{duration:2600,easing:'ease-out'});
+  setTimeout(()=>z.remove(),2700);
+}
+function doChirp(){
+  chickEl.classList.add('chirping');
+  setTimeout(()=>chickEl.classList.remove('chirping'),220);
+}
+function hop(){
+  chickBody.animate([
+    {transform:'translateY(0) scale(1,1)'},
+    {transform:'translateY(0) scale(1.09,.89)',offset:.18},
+    {transform:'translateY(-14px) scale(.94,1.09)',offset:.5},
+    {transform:'translateY(0) scale(1.05,.95)',offset:.82},
+    {transform:'translateY(0) scale(1,1)'}
+  ],{duration:420,easing:'ease-out'});
+}
+function heart(){
+  const h=document.createElement('div');
+  h.className='heart'; h.textContent='♥';
+  h.style.left=(chick.x-8)+'px'; h.style.top=(chick.y-chick.h/2-6)+'px';
+  field.appendChild(h);
+  h.animate([
+    {transform:'translateY(0) scale(.5)',opacity:0},
+    {transform:'translateY(-26px) scale(1.1)',opacity:1,offset:.3},
+    {transform:'translateY(-64px) scale(.9)',opacity:0}
+  ],{duration:1100,easing:'ease-out'});
+  setTimeout(()=>h.remove(),1200);
+}
+function addBond(){
+  if(bondVal>=100) return;
+  bondVal=Math.min(100,bondVal+7);
+  bond.style.width=bondVal+'%';
+  if(bondVal>=100&&!maxed){
+    maxed=true;
+    hintEl.textContent='もう、あなたしか見えていない';
+    hintEl.style.opacity='1';
+    for(let i=0;i<5;i++) setTimeout(heart,i*130);
+    Sound.piyo(true);
+  }
+}
+function playFrame(dt,now){
+  const dx=chick.tx-chick.x, dy=chick.ty-chick.y, d=Math.hypot(dx,dy);
+  const was=chick.walking;
+  chick.walking=d>5;
+  if(chick.walking){
+    const m=Math.min((125+bondVal*.75)*dt,d);
+    chick.x+=dx/d*m; chick.y+=dy/d*m;
+    chick.phase+=dt*11;
+    chick.bob=Math.abs(Math.sin(chick.phase))*(chick.h*.07);
+    chick.lean+=((dx/Math.max(d,1))*8-chick.lean)*Math.min(1,dt*7);
+  }else{
+    chick.phase=0;
+    chick.bob+=(0-chick.bob)*Math.min(1,dt*9);
+    chick.lean+=(0-chick.lean)*Math.min(1,dt*6);
+    if(was){ hop(); doChirp(); Sound.piyo(bondVal>=70); addBond(); if(bondVal>60) heart(); }
+  }
+  place();
+  const breathe=reduce?0:(sleeping ? Math.sin(now/1500)*(chick.h*.024) : Math.sin(now/620)*(chick.h*.008));
+  const sway=(sleeping&&!reduce) ? Math.sin(now/2100)*1.8 : 0;
+  chickBody.style.transform=`translateY(${-chick.bob+breathe}px) rotate(${chick.lean+sway}deg)`;
+  const k=chick.bob/Math.max(1,chick.h*.09);
+  chickShadow.style.transform=`translate(-50%,0) scale(${1-k*.14},${1-k*.3})`;
+  chickShadow.style.opacity=String(.9-k*.3);
+
+  const lx=chick.walking?chick.tx:(chick.look.x||chick.tx);
+  const ly=chick.walking?chick.ty:(chick.look.y||chick.ty);
+  const ang=Math.atan2(ly-chick.y,lx-chick.x);
+  const dd=Math.min(1,Math.hypot(lx-chick.x,ly-chick.y)/170);
+  const ex=sleeping?0:Math.cos(ang)*dd*1.1, ey=sleeping?0:Math.sin(ang)*dd*.8;
+  const open=sleeping?.09:(blinking?.12:1);
+  eyesLive.style.transform=`translate(${ex}px,${ey}px) scaleY(${open})`;
+
+  idleT+=dt; userT+=dt;
+  if(sleeping){
+    if(now-lastZ>2300){ lastZ=now; zzz(); }
+    return;
+  }
+  if(!chick.walking&&userT>SLEEP_AT){ fallAsleep(); return; }
+  if(idleT>4.5&&!chick.walking&&!reduce){
+    idleT=0;
+    setTarget(chick.x+(Math.random()*150-75), chick.y+(Math.random()*110-55));
+  }
+  if(now-lastChirp>7000+Math.random()*5000&&!chick.walking){
+    lastChirp=now; Sound.chirp(1050,.12,.3); doChirp();
+  }
+}
+setInterval(()=>{
+  if(state!=='play'||reduce) return;
+  blinking=true; setTimeout(()=>{blinking=false;},130);
+},3400);
+
+addEventListener('resize',()=>{
+  if(state==='cut'){ cutMode==='cut' ? layoutCut() : layoutFaceBox(); }
+  if(state==='play'){ sizeChick(); setTarget(chick.tx,chick.ty); }
+});
+
+function loop(now){
+  const dt=Math.min(.05,(now-lastT)/1000)||0;
+  lastT=now;
+  if(state==='egg') eggFrame(dt);
+  else if(state==='play') playFrame(dt,now);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(t=>{lastT=t;loop(t);});
+
+/* ---- スマホ：ダブルタップ拡大・ピンチ・長押し選択を止める ---- */
+let lastTouchEnd=0;
+document.addEventListener('touchend',e=>{
+  if(e.target.closest('label,input,button')) { lastTouchEnd=Date.now(); return; }
+  const t=Date.now();
+  if(t-lastTouchEnd<340) e.preventDefault();
+  lastTouchEnd=t;
+},{passive:false});
+['gesturestart','gesturechange','gestureend'].forEach(t=>
+  document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+document.addEventListener('contextmenu',e=>{
+  if(e.target.closest('img,canvas,svg')) e.preventDefault();
+});
+
+/* ---- HUD ---- */
+const soundBtn=$('soundBtn'), resetBtn=$('resetBtn');
+soundBtn.textContent=Sound.on?'音 ON':'音 OFF';
+soundBtn.addEventListener('click',()=>{
+  const on=Sound.toggle();
+  soundBtn.textContent=on?'音 ON':'音 OFF';
+  soundBtn.setAttribute('aria-pressed',String(on));
+});
+againBtn.addEventListener('click',()=>{
+  againBtn.hidden=true; splat.hidden=true; splat.innerHTML='';
+  state='start'; show(screenStart);
+});
+resetBtn.addEventListener('click',()=>{
+  state='start'; hud.classList.remove('on'); chickEl.hidden=true;
+  bondVal=0; bond.style.width='0%';
+  show(screenStart);
+});
+</script>
+</body>
+</html>
